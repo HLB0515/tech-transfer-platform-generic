@@ -10,7 +10,7 @@ const rows = [
     band: "D/C档",
     score: "35-50",
     title: "高端装备材料升级",
-    company: "豫创装备有限公司",
+    company: "创装备有限公司",
     field: "智能制造",
     region: "国内",
     indicators: "希望材料更轻、更结实、更耐用，适合无人机和无人艇使用。",
@@ -31,7 +31,7 @@ const rows = [
     band: "B档低段",
     score: "60-68",
     title: "无人装备用轻量化铝合金材料开发",
-    company: "豫创装备有限公司",
+    company: "创装备有限公司",
     field: "智能制造",
     region: "国内",
     indicators:
@@ -55,7 +55,7 @@ const rows = [
     band: "B档中高段",
     score: "70-78",
     title: "无人装备用高强耐蚀轻量化铝合金材料开发",
-    company: "豫创装备有限公司",
+    company: "创装备有限公司",
     field: "智能制造",
     region: "国内",
     indicators:
@@ -79,7 +79,7 @@ const rows = [
     band: "A档",
     score: "82-88",
     title: "面向无人机与无人艇平台的Al-Zn-Mg高强耐蚀轻量化铝合金材料开发",
-    company: "豫创装备有限公司",
+    company: "创装备有限公司",
     field: "智能制造",
     region: "国内",
     indicators:
@@ -103,7 +103,7 @@ const rows = [
     band: "A档高分",
     score: "90-96",
     title: "复杂海洋环境无人装备用Al-Zn-Mg高强韧耐蚀铝合金材料及结构件中试开发",
-    company: "豫创装备有限公司",
+    company: "创装备有限公司",
     field: "智能制造",
     region: "国内",
     indicators:

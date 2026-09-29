@@ -11204,7 +11204,7 @@ const demoAccounts = [
 
 const emptyDemand = {
   name: "",
-  company: "豫创装备有限公司",
+  company: "创装备有限公司",
   field: "智能制造",
   technicalIndicators: "",
   problem: "",
@@ -12442,7 +12442,7 @@ function IndustryChainScenes({ go }) {
 function SuccessCaseCards({ go }) {
   const cases = [
     ["无人装备轻量化材料", "长三角无人装备企业", "科学院/新材料团队", "技术经理人介入", "预计新增产值 1.8亿"],
-    ["农业大棚高强棚膜", "豫北设施农业企业", "大学材料团队", "直接推荐专家", "预计降本 12%"],
+    ["农业大棚高强棚膜", "设施农业企业", "大学材料团队", "直接推荐专家", "预计降本 12%"],
     ["冷链品质追溯标签", "食品企业", "江南大学食品团队", "政策+金融联动", "融资需求 800万"]
   ];
   return React.createElement("section", { className: "success-case-section" },
@@ -12921,7 +12921,7 @@ function escapeHtml(value) {
 function buildTransferReportHtml(demand, expert, complexity, managers) {
   const managerText = managers?.length ? managers.map((item) => `${item.name}（${item.recommendScore || item.responseRate}%）`).join("、") : "该需求边界较清晰，可先由双方智能体预沟通";
   const today = new Date().toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric" });
-  const reportNo = `豫科转智报〔${new Date().getFullYear()}〕${String(demand.id || 1).padStart(3, "0")}号`;
+  const reportNo = `科转智报〔${new Date().getFullYear()}〕${String(demand.id || 1).padStart(3, "0")}号`;
   const route = complexity?.routeLabel || expert.recommendationRouteLabel || "可直接推荐专家/成果";
   const reasons = complexity?.reasons?.join("；") || "需求画像较完整，建议先进入预沟通";
   const budget = demand.budgetText || demand.budgetAmount || "未说明";
