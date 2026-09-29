@@ -1,0 +1,21 @@
+{
+  "name": "tech-transfer-platform",
+  "version": "1.0.0",
+  "description": "科技成果转化平台原型",
+  "main": "server.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node tests/matcher.test.js"
+  },
+  "keywords": [
+    "technology-transfer",
+    "react",
+    "node",
+    "websocket"
+  ],
+  "author": "",
+  "license": "MIT"
+}

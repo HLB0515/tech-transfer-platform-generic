@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: tech-transfer-platform
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: ZHIPU_MODEL
+        value: glm-4-flash
+      - key: ZHIPU_SEARCH_MODEL
+        value: glm-4-plus
+      - key: ZHIPU_API_KEY
+        sync: false
