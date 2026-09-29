@@ -16,8 +16,10 @@ const EXCEL_SEED_FILE = path.join(DATA_DIR, "excel-seed.json");
 const PUBLIC_DIR = path.join(__dirname, "public");
 const SEED_VERSION = 8;
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
-const ZHIPU_MODEL = process.env.ZHIPU_MODEL || "glm-4-flash";
-const ZHIPU_SEARCH_MODEL = process.env.ZHIPU_SEARCH_MODEL || "glm-4-plus";
+const ZHIPU_MODEL = process.env.ZHIPU_MODEL || "glm-4.5-flash";
+const ZHIPU_SEARCH_MODEL = process.env.ZHIPU_SEARCH_MODEL || "glm-4.5-flash";
+const ZHIPU_FALLBACK_MODEL = process.env.ZHIPU_FALLBACK_MODEL || "glm-4-flash";
+const MODEL_TIMEOUT_MS = Number(process.env.MODEL_TIMEOUT_MS || 30000);
 const DEMO_TOTALS = Object.freeze({
   demands: 3876,
   experts: 3129,
@@ -1473,7 +1475,8 @@ async function handleApi(req, res) {
     const nextAgent = body.agentRole || inferNextNegotiationAgent(history);
     const speaker = nextAgent === "expertAgent" ? "科小专" : nextAgent === "managerAgent" ? "科小经" : "科小企";
     const prompt = buildNegotiationPrompt(nextAgent, demand, expert, history);
-    const modelResult = await callModel(prompt, { webSearch: Boolean(body.webSearch), searchQuery: `${demand.name || ""} ${expert.name || ""}` });
+    // 自动连续洽谈由系统逐轮推进，不启用联网搜索：既能保证每轮响应速度，也避免与限流叠加
+    const modelResult = await callModel(prompt, { webSearch: false, searchQuery: `${demand.name || ""} ${expert.name || ""}` });
     const message = {
       id: nextId(store.messages),
       conversationId: room.id,
@@ -1549,7 +1552,7 @@ async function handleApi(req, res) {
     const modelPrompt = buildStagedNegotiationPrompt(demand, expert, existing, nextLine.sender);
     const shouldUseModel = existing.length > 0 && nextLine.sender !== "agent";
     const modelResult = shouldUseModel ? await callModel(modelPrompt, {
-      webSearch: Boolean(body.webSearch),
+      webSearch: false,
       searchQuery: `${demand.name || ""} ${expert.name || ""} Al-Zn-Mg 无人装备`
     }) : null;
     const message = {
@@ -1599,7 +1602,7 @@ async function handleApi(req, res) {
       history.map((item) => `${item.speaker}：${item.text}`).join("\n") || "尚未开始。请先开场。",
       "请生成下一句。"
     ].join("\n");
-    const modelResult = await callModel(prompt, { webSearch: Boolean(body.webSearch), searchQuery: demand.name || body.text || "" });
+    const modelResult = await callModel(prompt, { webSearch: false, searchQuery: demand.name || body.text || "" });
     return sendJson(res, 200, {
       speaker: speakerName,
       role,
@@ -1672,19 +1675,20 @@ function buildAgentPrompt(role, text, store) {
   ].join("\n");
 }
 
-function callModel(prompt, options = {}) {
-  const provider = getModelProvider();
-  if (!provider) return Promise.resolve(null);
-  const model = options.webSearch && provider.name === "zhipu" ? ZHIPU_SEARCH_MODEL : provider.model;
+function buildChatPayload(model, prompt, options = {}, allowTools = true) {
   const payload = {
     model,
     messages: [
       { role: "system", content: "你是严谨、专业、懂科技成果转化的产业智能体。" },
       { role: "user", content: prompt }
     ],
-    temperature: 0.75
+    temperature: 0.75,
+    max_tokens: 1000,
+    // 关键：新版 GLM 默认开启思考模式，会把输出额度消耗在 reasoning 上，
+    // 导致正文 content 为空。这里显式关闭，保证直接产出可读答复。
+    thinking: { type: "disabled" }
   };
-  if (options.webSearch && provider.name === "zhipu") {
+  if (allowTools && options.webSearch) {
     payload.tools = [
       {
         type: "web_search",
@@ -1696,7 +1700,11 @@ function callModel(prompt, options = {}) {
       }
     ];
   }
-  const body = JSON.stringify(payload);
+  return payload;
+}
+
+function requestChatCompletion(provider, model, prompt, options = {}, allowTools = true) {
+  const body = JSON.stringify(buildChatPayload(model, prompt, options, allowTools));
   return new Promise((resolve) => {
     const req = https.request({
       hostname: provider.hostname,
@@ -1707,14 +1715,15 @@ function callModel(prompt, options = {}) {
         "Content-Type": "application/json",
         "Content-Length": Buffer.byteLength(body)
       },
-      timeout: 15000
+      timeout: MODEL_TIMEOUT_MS
     }, (res) => {
       let data = "";
       res.on("data", (chunk) => { data += chunk; });
       res.on("end", () => {
         try {
           const parsed = JSON.parse(data);
-          const reply = parsed.choices?.[0]?.message?.content || null;
+          const message = parsed?.choices?.[0]?.message || {};
+          const reply = String(message.content || "").trim() || String(message.reasoning_content || "").trim();
           resolve(reply ? { reply, model, provider: provider.name } : null);
         } catch {
           resolve(null);
@@ -1729,6 +1738,30 @@ function callModel(prompt, options = {}) {
     req.write(body);
     req.end();
   });
+}
+
+async function callModel(prompt, options = {}) {
+  const provider = getModelProvider();
+  if (!provider) return null;
+  if (provider.name !== "zhipu") {
+    return requestChatCompletion(provider, provider.model, prompt, options);
+  }
+  // 智谱：按「主模型 -> 主模型不联网 -> 稳定兜底模型」依次尝试，
+  // 免费模型高峰期限流（错误码 1305）时不会让页面变成哑巴。
+  const primary = options.webSearch ? ZHIPU_SEARCH_MODEL : ZHIPU_MODEL;
+  const chain = [];
+  if (primary) chain.push({ model: primary, allowTools: true });
+  if (options.webSearch && ZHIPU_MODEL && ZHIPU_MODEL !== primary) {
+    chain.push({ model: ZHIPU_MODEL, allowTools: false });
+  }
+  if (ZHIPU_FALLBACK_MODEL && !chain.some((step) => step.model === ZHIPU_FALLBACK_MODEL)) {
+    chain.push({ model: ZHIPU_FALLBACK_MODEL, allowTools: false });
+  }
+  for (const step of chain) {
+    const attempt = await requestChatCompletion(provider, step.model, prompt, options, step.allowTools);
+    if (attempt?.reply) return attempt;
+  }
+  return null;
 }
 
 function getModelProvider() {
